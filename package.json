@@ -1,0 +1,43 @@
+{
+  "name": "khud",
+  "version": "0.2.0",
+  "description": "Cross-agent identity compiler for Claude Code, OpenCode, and Cursor",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "bin": {
+    "khud": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "link": "npm run build && npm link",
+    "prepack": "npm run build",
+    "test": "npm run build && node --test tests/capture-finalize.test.mjs"
+  },
+  "keywords": [
+    "ai",
+    "claude",
+    "cursor",
+    "opencode",
+    "developer-tools",
+    "automation"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
