@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -81,21 +82,16 @@ export function writeSessionEpisode(record: CaptureRecord): string {
   const baseName = title === 'untitled'
     ? `${record.date}-${safeFileStem(record.session_id, 40)}`
     : `${record.date} — ${title}`;
-  let out = path.join(paths().sessionsDir, `${baseName}.md`);
-  if (fs.existsSync(out)) {
-    out = path.join(
-      paths().sessionsDir,
-      `${baseName}-${safeFileStem(record.capture_id, 12)}.md`
-    );
-  }
-
-  const lines = [
+  const frontmatter = [
     '---',
     `session_id: ${record.session_id}`,
     `capture_id: ${record.capture_id}`,
     `client: ${record.client}`,
     'status: current',
-    '---',
+    '---'
+  ];
+
+  const lines = [
     '',
     `# Session ${record.date}`,
     '',
@@ -133,6 +129,39 @@ export function writeSessionEpisode(record: CaptureRecord): string {
     lines.push('');
   }
 
-  atomicWriteText(out, `${lines.join('\n')}\n`);
-  return out;
+  const body = `${lines.join('\n')}\n`;
+  const text = `${frontmatter.join('\n')}\n${body}`;
+
+  // Filename disambiguation keys on a CONTENT fingerprint, never on capture_id.
+  // capture_id is a fresh randomUUID() per capture, so a capture_id-keyed suffix can
+  // never collide and therefore never dedups: 47 groups and 342 duplicate-body files
+  // in the vault came from exactly that, one group reaching 130 copies. capture-design.md
+  // section 5 requires the fingerprint be computed over capture content for this reason.
+  const primary = path.join(paths().sessionsDir, `${baseName}.md`);
+  if (!fs.existsSync(primary)) {
+    atomicWriteText(primary, text);
+    return primary;
+  }
+  if (readBody(primary) === body) return primary; // same content already stored, no write
+
+  const fingerprint = createHash('sha256').update(body).digest('hex').slice(0, 12);
+  const variant = path.join(paths().sessionsDir, `${baseName}-${fingerprint}.md`);
+  if (fs.existsSync(variant) && readBody(variant) === body) return variant;
+  atomicWriteText(variant, text);
+  return variant;
+}
+
+/** Read a note's body, i.e. everything after the leading frontmatter block. */
+function readBody(file: string): string {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+  } catch {
+    return '';
+  }
+  if (!raw.startsWith('---')) return raw;
+  const end = raw.indexOf('\n---', 3);
+  if (end === -1) return raw;
+  const after = raw.indexOf('\n', end + 1);
+  return after === -1 ? '' : raw.slice(after + 1);
 }
