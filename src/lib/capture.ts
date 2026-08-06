@@ -312,18 +312,17 @@ export function extractFromTranscript(
         }
       });
     }
-    const decision = matchExplicitDecision(quote);
-    if (decision) {
-      decisions.push({
-        ...decision,
-        evidence: {
-          kind: 'explicit_user',
-          quote,
-          transcript_path: transcriptPath,
-          confidence: 0.85
-        }
-      });
-    }
+    // matchExplicitDecision is deliberately NOT called here. capture-design.md section 3:
+    //   "A 22% false-fire rate is not a threshold problem, it is the wrong mechanism...
+    //    delete matchExplicitDecision from the hook path. Do not gate it harder."
+    //
+    // Its regex fired on the bare word use/ship/go-with anywhere in a message and took
+    // everything after it as the decision, with `why` set to the literal placeholder
+    // "explicit user decision". The prompt "use it for free like here or in the cli..."
+    // became Decisions/2026-07-30-it for free like here or in the cli like you prompt it...
+    // Those prompt-titled notes then OUTRANK real decisions on the lexical retrieval path,
+    // because the queries are user prompts too. Measured: 2 of 8 golden title queries lost
+    // rank 1 to exactly this. Agents write real decisions through capture files instead.
   }
 
   const status = deriveStatus(text, opts.client);
@@ -387,17 +386,6 @@ function matchExplicitPreference(quote: string): string | null {
     }
   }
   return null;
-}
-
-function matchExplicitDecision(quote: string): CaptureDecision | null {
-  const match = quote.match(
-    /(?:decide|decided|let's go with|go with|use|ship)\s+(.+?)(?:\s+because\s+(.+))?$/i
-  );
-  if (!match) return null;
-  return {
-    what: match[1].trim().slice(0, 200),
-    why: (match[2] || 'explicit user decision').trim().slice(0, 300)
-  };
 }
 
 function deriveStatus(text: string, client: CaptureClient): string {

@@ -67,6 +67,15 @@ export function writeDecisionNote(
   const id = decisionId(record.date, decision.what, record.session_id);
   const stem = safeFileStem(`${record.date}-${decision.what}`, 90);
   const filePath = path.join(paths().decisionsDir, `${stem}-${id}.md`);
+
+  // A note can never supersede itself. The id is derived from date|what|session_id, so
+  // re-finalizing one capture makes findCurrentDecisionByWhat return the very note about
+  // to be rewritten, and the caller then passes it back as `supersedes`. Observed in the
+  // vault: notes carrying `supersedes:` equal to their own id. Drop it rather than write a
+  // self-referential chain that any temporal query would have to special-case.
+  const supersedes =
+    opts.supersedes && !opts.supersedes.endsWith(id) ? opts.supersedes : undefined;
+
   const note: TemporalDecisionNote = {
     id,
     date: record.date,
@@ -74,7 +83,7 @@ export function writeDecisionNote(
     why: decision.why,
     status: opts.status || 'current',
     valid_from: record.date,
-    supersedes: opts.supersedes,
+    supersedes,
     session_id: record.session_id,
     client: record.client,
     capture_id: record.capture_id,
