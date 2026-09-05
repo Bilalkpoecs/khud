@@ -17,6 +17,23 @@ import type {
 const paths = () => resolvePaths();
 const CLIENTS = new Set<CaptureClient>(['cursor', 'claude-code', 'opencode', 'unknown']);
 
+/**
+ * Bounds on the two fields a capture can grow the profile with.
+ *
+ * `project_status` is written to a dynamic session episode, while every
+ * `stack_updates` entry can be appended to the static profile. Clamping both at
+ * validation keeps the capture and its note bounded, and prevents one capture
+ * from exhausting the profile ceiling through a stack update.
+ */
+export const MAX_PROJECT_STATUS_CHARS = 400;
+export const MAX_STACK_ITEM_CHARS = 160;
+export const MAX_STACK_UPDATES = 12;
+
+function clampText(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 3).trimEnd()}...`;
+}
+
 export class CaptureValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -118,9 +135,27 @@ function clampConfidence(value: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
+const NO_WHY = 'not recorded';
+
+/** Case- and whitespace-insensitive identity of a decision. */
+function decisionKey(what: string): string {
+  return what.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * The decisions in a capture, one per distinct `what`.
+ *
+ * Two decisions with the same `what` in one capture are the same decision: the
+ * note id is derived from `date|what|session_id`, so the second silently
+ * overwrote the first note on disk while `result.decisions` still counted two,
+ * and the Decision-Log idempotence key made the second append a no-op. Merging
+ * here is the one place that sees both records: the first occurrence keeps its
+ * position, and a later duplicate only fills in what the first is missing.
+ */
 function normalizeDecisions(raw: unknown): CaptureDecision[] {
   if (!Array.isArray(raw)) return [];
   const out: CaptureDecision[] = [];
+  const seen = new Map<string, CaptureDecision>();
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const obj = item as Record<string, unknown>;
@@ -128,7 +163,19 @@ function normalizeDecisions(raw: unknown): CaptureDecision[] {
     const why = String(obj.why || '').trim();
     if (!what) continue;
     const evidence = normalizeEvidence(obj.evidence);
-    out.push(evidence ? { what, why: why || 'not recorded', evidence } : { what, why: why || 'not recorded' });
+
+    const existing = seen.get(decisionKey(what));
+    if (existing) {
+      if (why && existing.why === NO_WHY) existing.why = why;
+      if (evidence && !existing.evidence) existing.evidence = evidence;
+      continue;
+    }
+
+    const decision: CaptureDecision = evidence
+      ? { what, why: why || NO_WHY, evidence }
+      : { what, why: why || NO_WHY };
+    seen.set(decisionKey(what), decision);
+    out.push(decision);
   }
   return out;
 }
@@ -152,6 +199,47 @@ function normalizePreferences(raw: unknown): CapturePreference[] {
   return out;
 }
 
+/** The fields that make a capture what it is. Deliberately timestamp-free. */
+interface CaptureIdentity {
+  client: CaptureClient;
+  session_id: string;
+  date: string;
+  project_status: string;
+  decisions: CaptureDecision[];
+  preferences_learned: CapturePreference[];
+  stack_updates: string[];
+}
+
+function canonicalCaptureBody(input: CaptureIdentity): unknown {
+  return [
+    input.client,
+    input.session_id,
+    input.date,
+    input.project_status,
+    input.decisions.map((d) => [d.what, d.why, d.evidence?.kind, d.evidence?.quote]),
+    input.preferences_learned.map((p) => [p.text, p.evidence?.kind, p.evidence?.quote]),
+    input.stack_updates
+  ];
+}
+
+/**
+ * A capture id derived from what the capture says, not from when it was made.
+ *
+ * `crypto.randomUUID()` used to fill this in, which made every re-fire of a stop
+ * hook a brand new capture: finalize keys its fingerprint on
+ * `client:session_id:capture_id`, so identical repeats could never collide with
+ * each other and each one was processed again. Deriving the id, and the content
+ * hash beside it, from the capture's own content is what makes the stop path
+ * re-entrant, and is why the OpenCode plugin no longer needs a one-shot flag.
+ */
+export function deriveCaptureId(input: CaptureIdentity): string {
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(canonicalCaptureBody(input)))
+    .digest('hex')
+    .slice(0, 32);
+}
+
 export function validateCapture(raw: unknown): CaptureRecord {
   if (!raw || typeof raw !== 'object') {
     throw new CaptureValidationError('capture must be an object');
@@ -163,15 +251,33 @@ export function validateCapture(raw: unknown): CaptureRecord {
   }
   const sessionId = String(obj.session_id || '').trim();
   if (!sessionId) throw new CaptureValidationError('session_id required');
-  const captureId = String(obj.capture_id || '').trim() || crypto.randomUUID();
   const createdAt = String(obj.created_at || new Date().toISOString());
   const date = String(obj.date || createdAt.slice(0, 10));
-  const projectStatus = String(obj.project_status || '').trim();
+  const projectStatus = clampText(
+    String(obj.project_status || '').trim(),
+    MAX_PROJECT_STATUS_CHARS
+  );
   const decisions = normalizeDecisions(obj.decisions);
   const preferences = normalizePreferences(obj.preferences_learned);
   const stack = Array.isArray(obj.stack_updates)
-    ? obj.stack_updates.map((item) => String(item).trim()).filter(Boolean)
+    ? [
+        ...new Set(
+          obj.stack_updates
+            .map((item) => clampText(String(item).trim(), MAX_STACK_ITEM_CHARS))
+            .filter(Boolean)
+        )
+      ].slice(0, MAX_STACK_UPDATES)
     : [];
+  const identity: CaptureIdentity = {
+    client,
+    session_id: sessionId,
+    date,
+    project_status: projectStatus,
+    decisions,
+    preferences_learned: preferences,
+    stack_updates: stack
+  };
+  const captureId = String(obj.capture_id || '').trim() || deriveCaptureId(identity);
 
   const body = {
     schema_version: 1 as const,
@@ -191,9 +297,12 @@ export function validateCapture(raw: unknown): CaptureRecord {
       : 'agent') as CaptureRecord['source']
   };
 
+  // Hashed over the capture's identity, not over `body`: `created_at` moves on
+  // every stop-hook fire, so a body hash made two identical captures look
+  // different and finalize processed both.
   return {
     ...body,
-    content_hash: String(obj.content_hash || contentHash(body))
+    content_hash: String(obj.content_hash || contentHash(canonicalCaptureBody(identity)))
   };
 }
 
@@ -218,14 +327,36 @@ export function quarantineCapture(filePath: string, reason: string): string {
     paths().quarantineDir,
     `${stamp}-${safeFileStem(path.basename(filePath), 60)}.json`
   );
-  let payload: unknown = { reason };
+  let payload: unknown = { reason, raw_text: null };
   try {
-    payload = { reason, raw: JSON.parse(fs.readFileSync(filePath, 'utf8')) };
-  } catch {
-    payload = { reason, raw_text: fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : null };
+    const stat = fs.lstatSync(filePath);
+    if (stat.isFile()) {
+      const rawText = fs.readFileSync(filePath, 'utf8');
+      try {
+        payload = { reason, raw: JSON.parse(rawText) };
+      } catch {
+        payload = { reason, raw_text: rawText };
+      }
+    } else {
+      payload = {
+        reason,
+        raw_text: null,
+        entry_type: stat.isDirectory() ? 'directory' : stat.isSymbolicLink() ? 'symlink' : 'other'
+      };
+    }
+  } catch (error) {
+    payload = {
+      reason,
+      raw_text: null,
+      read_error: (error as NodeJS.ErrnoException).code || (error as Error).message
+    };
   }
   atomicWriteJson(dest, payload);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  try {
+    if (fs.lstatSync(filePath).isFile()) fs.unlinkSync(filePath);
+  } catch {
+    // A disappearing or non-regular entry is already safely represented above.
+  }
   return dest;
 }
 
@@ -233,26 +364,76 @@ export function listInboxCaptures(): string[] {
   ensureCaptureDirs();
   const out: string[] = [];
   if (!fs.existsSync(paths().inboxDir)) return out;
-  for (const client of fs.readdirSync(paths().inboxDir)) {
-    const clientDir = path.join(paths().inboxDir, client);
-    if (!fs.statSync(clientDir).isDirectory()) continue;
-    for (const session of fs.readdirSync(clientDir)) {
-      const sessionDir = path.join(clientDir, session);
-      if (!fs.statSync(sessionDir).isDirectory()) continue;
-      for (const file of fs.readdirSync(sessionDir)) {
-        if (file.endsWith('.json')) out.push(path.join(sessionDir, file));
+  const walk = (dir: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && entry.name.endsWith('.json')) {
+        out.push(full);
       }
     }
+  };
+  for (const client of fs.readdirSync(paths().inboxDir, { withFileTypes: true })) {
+    if (!client.isDirectory()) continue;
+    walk(path.join(paths().inboxDir, client.name));
   }
   return out.sort();
 }
 
-export function pendingToCapture(pending: PendingSummary, sessionId?: string): CaptureRecord {
+/**
+ * What the hook that happens to be running knows about itself.
+ *
+ * Only ever a fallback. pending.json is written by whichever agent ended, and
+ * any agent's stop hook may be the next one to run, so a hint is trusted for
+ * attribution only when the file itself does not say.
+ */
+export interface LegacyBridgeHint {
+  sessionId?: string;
+  client?: CaptureClient;
+}
+
+/**
+ * Convert legacy pending.json into a capture, keeping its own attribution.
+ *
+ * pending.json carries `agent` (and newer writers carry `client` / `session_id`).
+ * Those were being dropped in favour of whichever hook fired: the bridge stamped
+ * the *calling* session's id onto the file, so an OpenCode session's summary was
+ * filed under the Claude Code session that happened to end next. The hint is now
+ * only consulted when the file is silent, and its session id is refused outright
+ * when the two clients disagree.
+ */
+export function pendingToCapture(
+  pending: PendingSummary,
+  hint: LegacyBridgeHint = {}
+): CaptureRecord {
+  const ownClient = normalizeClient(pending.client || pending.agent);
+  const hintClient = hint.client && hint.client !== 'unknown' ? hint.client : undefined;
+  const client = ownClient !== 'unknown' ? ownClient : hintClient || 'unknown';
+
+  const ownSession = String(pending.session_id || '').trim();
+  // A hook session id is usable only when the file names no session AND either
+  // the file does not say which agent wrote it, or it names the same agent as
+  // the hook. An unattributed hint is NOT good enough: a Stop hook that sends no
+  // client still belongs to some other agent's session, and stamping its id onto
+  // an opencode summary is exactly the cross-agent mixup this guards.
+  const hintSessionUsable =
+    Boolean(hint.sessionId) && (ownClient === 'unknown' || hintClient === ownClient);
+  const sessionId =
+    ownSession ||
+    (hintSessionUsable ? String(hint.sessionId) : '') ||
+    `legacy-${client}-${pending.date}`;
+
   return validateCapture({
     schema_version: 1,
-    capture_id: crypto.randomUUID(),
-    client: normalizeClient(pending.agent),
-    session_id: sessionId || `legacy-${pending.agent}-${pending.date}`,
+    client,
+    session_id: sessionId,
     created_at: new Date().toISOString(),
     date: pending.date,
     project_status: pending.project_status || '',
@@ -395,15 +576,37 @@ function deriveStatus(text: string, client: CaptureClient): string {
   return `Session captured from ${client}`;
 }
 
-export function bridgeLegacyPending(sessionId?: string): string | null {
-  if (!fs.existsSync(paths().pendingFile)) return null;
+/**
+ * Bridge pending.json into the inbox, claiming the file before reading it.
+ *
+ * The read-then-unlink order let two stop hooks that fired together both read
+ * the same summary and both write a capture: the two captures differ only by
+ * the session id each hook supplied, so the content-derived capture id differs
+ * too and finalize processes both. `rename` is atomic on POSIX, so exactly one
+ * caller gets the bytes and every other caller sees ENOENT and does nothing.
+ * The claim name carries the pid so two claims never collide.
+ */
+export function bridgeLegacyPending(hint: LegacyBridgeHint = {}): string | null {
+  const pendingFile = paths().pendingFile;
+  if (!fs.existsSync(pendingFile)) return null;
+  ensureCaptureDirs();
+
+  const claimed = `${pendingFile}.claim-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   try {
-    const pending = JSON.parse(fs.readFileSync(paths().pendingFile, 'utf8')) as PendingSummary;
-    const { path: written } = writeCapture(pendingToCapture(pending, sessionId));
-    fs.unlinkSync(paths().pendingFile);
+    fs.renameSync(pendingFile, claimed);
+  } catch (error) {
+    // Lost the race, or the file went away. Either way there is nothing to do.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+
+  try {
+    const pending = JSON.parse(fs.readFileSync(claimed, 'utf8')) as PendingSummary;
+    const { path: written } = writeCapture(pendingToCapture(pending, hint));
+    if (fs.existsSync(claimed)) fs.unlinkSync(claimed);
     return written;
   } catch (error) {
-    quarantineCapture(paths().pendingFile, `legacy pending invalid: ${(error as Error).message}`);
+    quarantineCapture(claimed, `legacy pending invalid: ${(error as Error).message}`);
     return null;
   }
 }

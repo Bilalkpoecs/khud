@@ -21,6 +21,7 @@ import {
   ProfileCeilingError,
   writeProfile
 } from '../dist/lib/profile.js';
+import { announcePendingReview, sentinelReviewUrl } from '../dist/lib/notice.js';
 import {
   isSubstantiveStatus,
   shouldWriteSessionEpisode
@@ -107,6 +108,11 @@ test('no preference reaches the profile without approval, however strong the evi
   // queued like everything else, so sentinel is the only promotion path.
   assert.equal(result.promoted_preferences, 0);
   assert.equal(result.pending_review, 2);
+  // Every queued rule reports its candidate id so the notice can deep-link it.
+  assert.equal(result.pending_review_ids.length, 2);
+  for (const id of result.pending_review_ids) {
+    assert.ok(fs.existsSync(path.join(root, '.khud', 'candidates', `${id}.json`)));
+  }
 
   const profile = JSON.parse(fs.readFileSync(path.join(root, '.khud', 'profile.json'), 'utf8'));
   assert.ok(!profile.preferences.includes('Always prefer named exports in TypeScript'));
@@ -360,7 +366,7 @@ test('writeProfile allows a write that exactly fits the ceiling', () => {
   assert.ok(JSON.parse(written).preferences.includes('y'.repeat(padding)));
 });
 
-test('a blocked capture is not marked processed, so it is retried after a retirement', async () => {
+test('a full static profile does not block a dynamic stack session', async () => {
   const root = seedTempHome();
   const profilePath = path.join(root, '.khud', 'profile.json');
 
@@ -384,20 +390,17 @@ test('a blocked capture is not marked processed, so it is retried after a retire
     source: 'agent'
   });
 
-  const blocked = await finalizeInbox({ syncAgents: false });
-  assert.equal(blocked.ceiling_blocked, 1);
-  assert.equal(blocked.processed, 0);
-
-  // Retire the filler, then finalize again. The same capture now lands.
-  const trimmed = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-  trimmed.stack = trimmed.stack.filter((item) => item !== filler);
-  writeProfile(trimmed);
-
-  const retried = await finalizeInbox({ syncAgents: false });
-  assert.equal(retried.ceiling_blocked, 0);
-  assert.equal(retried.processed, 1);
+  const finalized = await finalizeInbox({ syncAgents: false });
+  assert.equal(finalized.ceiling_blocked, 0);
+  assert.equal(finalized.processed, 1);
   const after = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-  assert.ok(after.stack.includes('this stack entry does not fit under the ceiling'));
+  assert.ok(!after.stack.includes('this stack entry does not fit under the ceiling'));
+  assert.ok(after.stack.includes(filler));
+  const note = fs.readFileSync(
+    path.join(root, 'vault', 'Sessions', fs.readdirSync(path.join(root, 'vault', 'Sessions'))[0]),
+    'utf8'
+  );
+  assert.match(note, /this stack entry does not fit under the ceiling/);
 });
 
 test('the ledger records every preference that appears or vanishes', () => {
@@ -518,4 +521,33 @@ test('the cursor adapter emits name and constraints', () => {
   assert.match(written, /Bilal Ahmad/);
   assert.match(written, /X11 not Wayland/);
   assert.match(written, /use aplay not paplay/);
+});
+
+test('the pending notice links the latest candidate detail page, never bare /review', () => {
+  const lines = [];
+  const realLog = console.log;
+  console.log = (line) => lines.push(String(line));
+  try {
+    announcePendingReview([]);
+    assert.equal(lines.length, 0, 'nothing pending means no notice');
+
+    announcePendingReview(['aaaa000000000001']);
+    announcePendingReview(['aaaa000000000001', 'bbbb000000000002']);
+  } finally {
+    console.log = realLog;
+  }
+
+  assert.equal(lines.length, 2);
+  assert.equal(
+    lines[0],
+    '1 rule pending approval: http://localhost:11437/review/aaaa000000000001'
+  );
+  // Latest queued id wins. Sentinel has no bare /review page, so it must never appear.
+  assert.equal(
+    lines[1],
+    '2 rules pending approval (latest): http://localhost:11437/review/bbbb000000000002'
+  );
+  for (const line of lines) assert.doesNotMatch(line, /\/review(\s|$)/);
+
+  assert.equal(sentinelReviewUrl('abc'), 'http://localhost:11437/review/abc');
 });

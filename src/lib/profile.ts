@@ -61,6 +61,52 @@ export function readProfile(): Profile {
   return normalizeProfile(JSON.parse(fs.readFileSync(profilePath, 'utf8')) as Profile);
 }
 
+/**
+ * The exact bytes a `writeProfile` call would put on disk, without writing.
+ *
+ * `updated` is stamped here the same way the writer stamps it, and the trailing
+ * newline is included, so a caller can check the ceiling before it starts a
+ * multi-file commit. Works on a deep copy: probing must not mutate the profile
+ * the caller is still assembling.
+ */
+export function serializeProfile(profile: Profile): string {
+  const probe = normalizeProfile(JSON.parse(JSON.stringify(profile)) as Profile);
+  probe.updated = new Date().toISOString().slice(0, 10);
+  return `${JSON.stringify(probe, null, 2)}\n`;
+}
+
+/**
+ * A profile's content with the write timestamp taken out.
+ *
+ * `updated` is restamped by every write, so any byte-level comparison of two
+ * serializations reports a difference even when nothing semantic changed. This
+ * is what finalize compares to decide whether a capture has anything to write:
+ * a capture that adds no stack entry, no status and no approved preference must
+ * not be measured against the ceiling, because a full profile was rejecting
+ * captures that would not have added a byte of content and they then sat in the
+ * inbox forever. Works on a deep copy.
+ */
+export function profileSemanticKey(profile: Profile): string {
+  const probe = normalizeProfile(JSON.parse(JSON.stringify(profile)) as Profile);
+  probe.updated = '';
+  return JSON.stringify(probe);
+}
+
+/**
+ * Throw `ProfileCeilingError` if this profile would breach the ceiling.
+ *
+ * Exists so finalize can fail closed BEFORE it writes vault notes. Previously
+ * the only check lived inside `writeProfile`, which runs last, so a blocked
+ * capture had already written its session note, its decision notes and a
+ * Decision-Log entry by the time it was refused.
+ */
+export function assertProfileWithinCeiling(profile: Profile): void {
+  const attemptedBytes = Buffer.byteLength(serializeProfile(profile), 'utf8');
+  if (attemptedBytes > PROFILE_CEILING_BYTES) {
+    throw new ProfileCeilingError(attemptedBytes, PROFILE_CEILING_BYTES);
+  }
+}
+
 export interface WriteProfileOptions {
   /** Why this changed. Recorded in the ledger against each affected entry. */
   reason?: string;
@@ -91,7 +137,9 @@ export function writeProfile(profile: Profile, options: WriteProfileOptions = {}
   // (`sentinel-app/backend/src/profile/profile.service.ts`, serialize()). Without
   // it the two writers produce files one byte apart and each enforces the ceiling
   // against its own count, which is the drift the shared constant exists to stop.
-  const serialized = `${JSON.stringify(normalizedProfile, null, 2)}\n`;
+  // One serializer for the probe and the write, so `assertProfileWithinCeiling`
+  // can never disagree with what actually lands on disk.
+  const serialized = serializeProfile(normalizedProfile);
   const attemptedBytes = Buffer.byteLength(serialized, 'utf8');
   if (attemptedBytes > PROFILE_CEILING_BYTES) {
     throw new ProfileCeilingError(attemptedBytes, PROFILE_CEILING_BYTES);

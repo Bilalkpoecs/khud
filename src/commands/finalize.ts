@@ -13,7 +13,7 @@ export async function cmdFinalize(): Promise<void> {
         `quarantine=${result.quarantined}`
     )
   );
-  announcePendingReview(result.pending_review);
+  announcePendingReview(result.pending_review_ids);
 }
 
 export async function cmdFinalizeFromHook(): Promise<void> {

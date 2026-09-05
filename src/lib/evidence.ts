@@ -9,10 +9,41 @@ import type {
   CaptureRecord,
   EvidenceRef,
   MemoryCandidate,
+  MemoryStatus,
   Profile
 } from './types.js';
 
 const paths = () => resolvePaths();
+
+/**
+ * Statuses that represent a decision already taken about a candidate.
+ *
+ * Candidate ids are content-derived, so the same rule seen in a later session,
+ * or the same capture replayed, rewrites the same file. An unguarded rewrite
+ * turned an explicit `rejected` back into `pending_review` and re-queued a rule
+ * the owner had already turned down, and put an approved one back in the queue.
+ */
+const TERMINAL_CANDIDATE_STATUSES = new Set<MemoryStatus>([
+  'promoted',
+  'current',
+  'rejected',
+  'superseded'
+]);
+
+export function isTerminalCandidateStatus(status: MemoryStatus): boolean {
+  return TERMINAL_CANDIDATE_STATUSES.has(status);
+}
+
+/** One candidate by id, or null when absent or unreadable. */
+export function readCandidate(id: string): MemoryCandidate | null {
+  try {
+    const file = path.join(paths().candidatesDir, `${id}.json`);
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8')) as MemoryCandidate;
+  } catch {
+    return null;
+  }
+}
 
 export function ensureCandidatesDir(): void {
   fs.mkdirSync(paths().candidatesDir, { recursive: true });
@@ -96,9 +127,22 @@ export function loadBehaviorEvidence(): MemoryCandidate[] {
   return out;
 }
 
+/** Write a candidate, never regressing a status the owner already settled. */
 export function saveCandidate(candidate: MemoryCandidate): void {
   ensureCandidatesDir();
-  atomicWriteJson(path.join(paths().candidatesDir, `${candidate.id}.json`), candidate);
+  const prior = readCandidate(candidate.id);
+  const next: MemoryCandidate =
+    prior &&
+    isTerminalCandidateStatus(prior.status) &&
+    !isTerminalCandidateStatus(candidate.status)
+      ? {
+          ...candidate,
+          status: prior.status,
+          valid_to: prior.valid_to,
+          supersedes: prior.supersedes
+        }
+      : candidate;
+  atomicWriteJson(path.join(paths().candidatesDir, `${next.id}.json`), next);
 }
 
 export function buildPreferenceCandidate(
@@ -118,9 +162,16 @@ export function buildPreferenceCandidate(
   // even a verbatim quote. Evidence is still classified and recorded so the
   // review UI can show why a candidate is trustworthy, which is what makes
   // approving a strong candidate a glance rather than an investigation.
-  const status: MemoryCandidate['status'] = contradictions.length
-    ? 'contradicted'
-    : 'pending_review';
+  //
+  // A status the owner already settled wins over a freshly computed one, so a
+  // replay neither re-queues a rejected rule nor counts it as pending review.
+  const prior = readCandidate(id);
+  const status: MemoryCandidate['status'] =
+    prior && isTerminalCandidateStatus(prior.status)
+      ? prior.status
+      : contradictions.length
+        ? 'contradicted'
+        : 'pending_review';
 
   if (!contradictions.length && evidence.kind !== 'explicit_user') {
     // verified_behavior: second independent session with same preference text
@@ -151,22 +202,35 @@ export function buildPreferenceCandidate(
   };
 }
 
+export interface PreferencePromotionPlan {
+  profile: Profile;
+  promoted: number;
+  pending: number;
+  /** Ids in queue order so the caller can deep-link the latest pending rule. */
+  pendingIds: string[];
+}
+
 /**
- * Persist candidates and apply any already marked `current`.
+ * What these candidates would do to the profile. Writes nothing.
+ *
+ * Split out of `promoteEligiblePreferences` so finalize can compute the whole
+ * profile mutation, check the byte ceiling, and only then start writing. The
+ * returned profile is the same object, mutated in place, which is what every
+ * caller wants.
  *
  * `buildPreferenceCandidate` no longer produces `current`, so in the capture
  * path this only ever queues. The `current` branch stays because sentinel
  * approval sets that status, and this is the one place that turns an approved
  * candidate into a profile entry.
  */
-export function promoteEligiblePreferences(
+export function planPreferencePromotions(
   candidates: MemoryCandidate[],
   profile: Profile
-): { profile: Profile; promoted: number; pending: number } {
+): PreferencePromotionPlan {
   let promoted = 0;
   let pending = 0;
+  const pendingIds: string[] = [];
   for (const candidate of candidates) {
-    saveCandidate(candidate);
     // Both tokens mean approved. Sentinel writes 'promoted'; 'current' is khud's
     // own older spelling. Matching only one silently drops approved entries.
     if (candidate.status === 'current' || candidate.status === 'promoted') {
@@ -178,7 +242,25 @@ export function promoteEligiblePreferences(
     }
     if (candidate.status === 'pending_review' || candidate.status === 'contradicted') {
       pending += 1;
+      pendingIds.push(candidate.id);
     }
   }
-  return { profile, promoted, pending };
+  return { profile, promoted, pending, pendingIds };
+}
+
+/**
+ * Write candidate files. Ids are content-derived, so re-running a capture
+ * rewrites the same files rather than queueing the rule twice.
+ */
+export function persistCandidates(candidates: MemoryCandidate[]): void {
+  for (const candidate of candidates) saveCandidate(candidate);
+}
+
+/** Persist candidates, then apply any already marked approved. */
+export function promoteEligiblePreferences(
+  candidates: MemoryCandidate[],
+  profile: Profile
+): PreferencePromotionPlan {
+  persistCandidates(candidates);
+  return planPreferencePromotions(candidates, profile);
 }
