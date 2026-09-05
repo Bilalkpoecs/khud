@@ -16,7 +16,8 @@
     "dev": "tsc --watch",
     "link": "npm run build && npm link",
     "prepack": "npm run build",
-    "test": "npm run build && node --test tests/capture-finalize.test.mjs"
+    "test": "npm run build && node --test tests/capture-finalize.test.mjs tests/repair-regressions.test.mjs tests/session-note-dedupe.test.mjs tests/prompt-echo-guard.test.mjs tests/context-preview.test.mjs tests/context-sync.test.mjs",
+    "test:focused": "npm run build && node --test tests/repair-regressions.test.mjs"
   },
   "keywords": [
     "ai",

@@ -42,6 +42,14 @@ export interface ResolvedPaths {
   opencodePluginsDir: string;
   opencodeAgentsDir: string;
   opencodeIdentityFile: string;
+  codexDir: string;
+  codexAgentsFile: string;
+  piAgentDir: string;
+  piAgentsFile: string;
+  hermesDir: string;
+  hermesSoulFile: string;
+  hermesProfilesDir: string;
+  ancestorAgentsFile: string;
 }
 
 type RuntimePlatform = NodeJS.Platform | 'win32' | 'darwin' | 'linux';
@@ -70,6 +78,9 @@ export function resolvePaths(
   const opencodeConfigDir = pathApi.join(configDir, 'opencode');
   const opencodeAgentsDir = env.KHUD_OPENCODE_AGENTS_DIR || pathApi.join(opencodeConfigDir, 'agents');
   const decisionsDir = pathApi.join(vaultDir, 'Decisions');
+  const codexDir = pathApi.join(homeDir, '.codex');
+  const piAgentDir = pathApi.join(homeDir, '.pi', 'agent');
+  const hermesDir = pathApi.join(homeDir, '.hermes');
 
   return {
     homeDir,
@@ -98,7 +109,16 @@ export function resolvePaths(
     opencodeConfigDir,
     opencodePluginsDir: pathApi.join(opencodeConfigDir, 'plugins'),
     opencodeAgentsDir,
-    opencodeIdentityFile: pathApi.join(opencodeAgentsDir, 'khud-identity.md')
+    opencodeIdentityFile: pathApi.join(opencodeAgentsDir, 'khud-identity.md'),
+    codexDir,
+    codexAgentsFile: pathApi.join(codexDir, 'AGENTS.md'),
+    piAgentDir,
+    piAgentsFile: pathApi.join(piAgentDir, 'AGENTS.md'),
+    hermesDir,
+    hermesSoulFile: pathApi.join(hermesDir, 'SOUL.md'),
+    hermesProfilesDir: pathApi.join(hermesDir, 'profiles'),
+    // Codex and Pi both concatenate ancestor AGENTS.md files into the effective load.
+    ancestorAgentsFile: pathApi.join(homeDir, 'AGENTS.md')
   };
 }
 

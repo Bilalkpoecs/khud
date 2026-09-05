@@ -23,6 +23,8 @@ export interface Profile {
   stack: string[];
   agents: string[];
   preferences: string[];
+  /** Deterministic paths to scoped guidance. Optional so older profiles stay parseable. */
+  routing?: string[];
   active_project: ActiveProject;
   recent_decisions: Decision[];
   constraints: string[];
@@ -31,6 +33,10 @@ export interface Profile {
 /** @deprecated Prefer CaptureRecord inbox. Kept for legacy pending.json bridge. */
 export interface PendingSummary {
   agent: string;
+  /** Newer writers state the client explicitly; `agent` is the older spelling. */
+  client?: string;
+  /** The session that wrote this file. Never the session that bridges it. */
+  session_id?: string;
   date: string;
   decisions: PendingDecision[];
   preferences_learned: string[];
@@ -112,6 +118,8 @@ export interface FinalizeResult {
   decisions: number;
   promoted_preferences: number;
   pending_review: number;
+  /** Candidate ids queued this run, in queue order. Last entry is the latest. */
+  pending_review_ids: string[];
   skipped_duplicates: number;
   /** Captures refused because the profile would breach its byte ceiling. */
   ceiling_blocked: number;

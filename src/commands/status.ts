@@ -3,6 +3,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 import chalk from 'chalk';
+import { hermesSoulFiles } from '../adapters/hermes.js';
+import { SUPPORTED_TARGETS, type SupportedTarget } from '../lib/agents.js';
 import { listInboxCaptures } from '../lib/capture.js';
 import { displayPath, resolvePaths } from '../lib/paths.js';
 
@@ -14,21 +16,23 @@ export function cmdStatus(): void {
   console.log('');
 
   checkFile('Profile', path.join(paths().khudDir, 'profile.json'));
-  checkFile('Claude', paths().claudeMarkdown);
-  checkFile('OpenCode', paths().opencodeIdentityFile);
-  checkFile('Cursor', paths().cursorRuleFile);
+  for (const target of SUPPORTED_TARGETS) {
+    for (const file of projectionFiles(target)) {
+      checkFile(target, file);
+    }
+  }
 
   console.log('');
 
   checkHookContent(
     'Claude hooks',
     paths().claudeSettings,
-    ['UserPromptSubmit', 'khud-prompt-recall-claude', 'khud-obsidian-stop']
+    ['UserPromptSubmit', 'turbovec-recall-prompt --client claude-code', 'khud-obsidian-stop']
   );
   checkHookContent(
     'Cursor hooks',
     paths().cursorHooks,
-    ['turbovec-recall-prompt', 'khud-obsidian-stop']
+    ['turbovec-recall-prompt --client cursor', 'khud-obsidian-stop']
   );
   checkHookContent(
     'OpenCode plugin',
@@ -43,6 +47,18 @@ export function cmdStatus(): void {
   checkLogs();
   checkBackup();
   console.log('');
+}
+
+/** Every supported target reports its own generated files, so a missing one is visible. */
+function projectionFiles(target: SupportedTarget): string[] {
+  const resolved = paths();
+  if (target === 'claude') return [resolved.claudeMarkdown];
+  if (target === 'codex') return [resolved.codexAgentsFile];
+  if (target === 'opencode') return [resolved.opencodeIdentityFile];
+  if (target === 'cursor') return [resolved.cursorRuleFile];
+  if (target === 'pi') return [resolved.piAgentsFile];
+  const souls = hermesSoulFiles();
+  return souls.length ? souls : [resolved.hermesSoulFile];
 }
 
 function checkFile(label: string, fullPath: string): void {
@@ -76,7 +92,7 @@ function checkMirrorsFresh(): void {
   const profile = path.join(paths().khudDir, 'profile.json');
   if (!fs.existsSync(profile)) return;
   const profileMtime = fs.statSync(profile).mtimeMs;
-  const mirrors = [paths().claudeMarkdown, paths().cursorRuleFile, paths().opencodeIdentityFile];
+  const mirrors = SUPPORTED_TARGETS.flatMap((target) => projectionFiles(target));
   for (const mirror of mirrors) {
     if (!fs.existsSync(mirror)) continue;
     const lagMin = (profileMtime - fs.statSync(mirror).mtimeMs) / 60000;

@@ -9,7 +9,12 @@ export function cmdSync(target: string = 'all'): void {
   console.log('');
   console.log(chalk.bold('khud sync') + chalk.gray(` -> ${target}`));
   console.log('');
-  sync(profile, target as Target);
+  const result = sync(profile, target as Target);
   console.log('');
-  console.log(chalk.green('✓ done'));
+  if (result.failed.length > 0) {
+    // syncTargets already set a nonzero exit code. Never print a green tick over it.
+    console.log(chalk.red(`\u2717 ${result.failed.length} target(s) failed: ${result.failed.map((item) => item.target).join(', ')}`));
+    return;
+  }
+  console.log(chalk.green('\u2713 done'));
 }

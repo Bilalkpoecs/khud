@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 import { resolvePaths } from './paths.js';
 
-export const SUPPORTED_TARGETS = ['claude', 'opencode', 'cursor'] as const;
+export const SUPPORTED_TARGETS = ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes'] as const;
 
 export type SupportedTarget = (typeof SUPPORTED_TARGETS)[number];
 
@@ -27,16 +27,17 @@ export function expandTargets(target: string = 'all'): SupportedTarget[] {
   throw new Error(`Unsupported target: ${target}`);
 }
 
+const AGENT_NAMES: Record<SupportedTarget, string> = {
+  claude: 'Claude Code',
+  codex: 'Codex',
+  opencode: 'OpenCode',
+  cursor: 'Cursor',
+  pi: 'Pi',
+  hermes: 'Hermes',
+};
+
 export function getAgentName(target: SupportedTarget): string {
-  if (target === 'claude') {
-    return 'Claude Code';
-  }
-
-  if (target === 'opencode') {
-    return 'OpenCode';
-  }
-
-  return 'Cursor';
+  return AGENT_NAMES[target];
 }
 
 export function detectInstalledAgents(): DetectedAgent[] {
@@ -53,6 +54,9 @@ export function detectInstalledAgents(): DetectedAgent[] {
     paths.opencodeConfigDir,
     paths.opencodeAgentsDir
   ]);
+  maybeAddDetection(detections, 'codex', 'codex', [paths.codexDir, paths.codexAgentsFile]);
+  maybeAddDetection(detections, 'pi', 'pi', [paths.piAgentDir, paths.piAgentsFile]);
+  maybeAddDetection(detections, 'hermes', 'hermes', [paths.hermesDir, paths.hermesSoulFile]);
   maybeAddDetection(detections, 'cursor', 'cursor', [
     '/usr/bin/cursor',
     '/opt/Cursor',

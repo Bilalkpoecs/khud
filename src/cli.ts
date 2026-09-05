@@ -3,6 +3,7 @@ import { Command } from 'commander';
 
 import { cmdAddDecision, cmdAddPreference, cmdAddStack, cmdSetStatus } from './commands/add.js';
 import { cmdCaptureValidate, cmdCaptureWrite, cmdMigrateDecisions } from './commands/capture.js';
+import { cmdContextDiff, cmdContextPreview } from './commands/context.js';
 import { cmdDiff } from './commands/diff.js';
 import { cmdFinalize, cmdFinalizeFromHook } from './commands/finalize.js';
 import { cmdHistory } from './commands/history.js';
@@ -49,6 +50,22 @@ program
   .description('Alias for sync (used by hooks)')
   .option('--to <target>', 'target agent', 'all')
   .action((options: { to: string }) => cmdSync(options.to));
+
+const contextCommand = program.command('context').description('Inspect shared instructions without changing live files');
+
+contextCommand
+  .command('preview')
+  .description('Preview shared instructions for six agents; exit nonzero when over budget')
+  .option('--to <target>', 'preview target: claude | codex | opencode | cursor | pi | hermes | all', 'all')
+  .option('--profile <path>', 'use a staged profile instead of the live profile')
+  .option('--json', 'print the complete structured preview')
+  .action(cmdContextPreview);
+
+contextCommand
+  .command('diff')
+  .description('Compare each agent\'s generated file against the current profile')
+  .option('--to <target>', 'target agent or all', 'all')
+  .action(cmdContextDiff);
 
 const addCommand = program.command('add').description('Add to profile');
 
