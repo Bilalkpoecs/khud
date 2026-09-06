@@ -125,6 +125,11 @@ npm test
 
 Issues and pull requests: https://github.com/Bilalkpoecs/khud/issues
 
+## Author
+
+Bilal Ahmad, AI agents and automation engineer.
+[gravatar.com/bilalkpoecs](https://gravatar.com/bilalkpoecs)
+
 ## License
 
 MIT
