@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 
 import chalk from 'chalk';
 import { hermesSoulFiles } from '../adapters/hermes.js';
@@ -10,7 +9,7 @@ import { displayPath, resolvePaths } from '../lib/paths.js';
 
 const paths = () => resolvePaths();
 
-export function cmdStatus(): void {
+export async function cmdStatus(): Promise<void> {
   console.log('');
   console.log(chalk.bold('khud status'));
   console.log('');
@@ -43,7 +42,7 @@ export function cmdStatus(): void {
   console.log('');
   checkMirrorsFresh();
   checkInbox();
-  checkIndex();
+  await checkIndex();
   checkLogs();
   checkBackup();
   console.log('');
@@ -117,14 +116,27 @@ function checkInbox(): void {
   }
 }
 
-function checkIndex(): void {
+/**
+ * Read-only health probe against the local turbovec dashboard.
+ *
+ * Uses the built-in fetch rather than shelling out to curl. Spawning curl meant
+ * a subprocess and an external binary dependency for what is one loopback GET,
+ * and it showed up in supply-chain scanners as shell execution plus an embedded
+ * URL. Node 18 is already the floor in `engines`, so fetch is always available.
+ *
+ * Loopback only. khud makes no other network call.
+ */
+const TURBOVEC_STATUS_URL = 'http://127.0.0.1:11435/api/status';
+
+async function checkIndex(): Promise<void> {
   try {
-    const raw = execFileSync(
-      'curl',
-      ['-fsS', 'http://127.0.0.1:11435/api/status'],
-      { encoding: 'utf8', timeout: 2000 }
-    );
-    const status = JSON.parse(raw) as {
+    const response = await fetch(TURBOVEC_STATUS_URL, {
+      signal: AbortSignal.timeout(2000)
+    });
+    if (!response.ok) {
+      throw new Error(`dashboard returned ${response.status}`);
+    }
+    const status = (await response.json()) as {
       in_sync?: boolean;
       stale_changed?: number;
       watch?: { active?: boolean; state?: string };

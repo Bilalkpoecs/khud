@@ -164,7 +164,7 @@ hooksCommand
 program
   .command('status')
   .description('Show which agents are wired and files are in place')
-  .action(() => cmdStatus());
+  .action(async () => { await cmdStatus(); });
 
 program
   .command('nlm-ensure')

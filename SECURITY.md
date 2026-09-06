@@ -38,3 +38,26 @@ and write files that shape what AI agents do, so the relevant risk is local:
 
 Findings that let untrusted content reach an instruction file or a hook without
 passing the approval gate are the ones worth reporting first.
+
+## Supply-chain scanner alerts, explained
+
+Automated scanners flag khud for capabilities that are inherent to what it is: a
+local CLI that wires AI agents. None of them are network exfiltration. For the
+record, and so a reviewer does not have to reverse-engineer it:
+
+| Alert | Why it fires | Where |
+|---|---|---|
+| Shell / local binary execution | Detects installed agents via `<agent> --version`, runs the reindex script on finalize, calls `notify-send` for desktop notices | `src/lib/agents.ts`, `src/lib/finalize.ts`, `src/lib/notice.ts` |
+| Filesystem access | Its entire purpose: read one profile, write each agent's instruction file | `src/adapters/*` |
+| Environment variable access | Path resolution only: `HOME`, `USERPROFILE`, `APPDATA`, `XDG_CONFIG_HOME`, and the `KHUD_*` overrides | `src/lib/paths.ts` |
+| URL strings | One loopback URL, `http://127.0.0.1:11435/api/status`, a read-only health probe of the local turbovec dashboard with a 2s timeout. Everything else scanners list here is a filename, not a URL | `src/commands/status.ts` |
+| Code anomaly (hooks) | The OpenCode plugin passes prompt content and a session id to a local recall script and injects the result back into the session. That is the memory feature working as designed | `src/commands/hooks.ts` |
+
+**khud makes no outbound network requests.** The only network call in the
+codebase is the loopback probe above. There is no telemetry, no analytics, no
+update check, and no call to any host you do not run yourself.
+
+**What is worth scrutinising** is the same thing listed earlier on this page:
+whether untrusted, model-authored content can reach an instruction file or a
+hook without passing `khud approve`. That is the real threat model, not the
+capability list.
