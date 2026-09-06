@@ -1,0 +1,46 @@
+name: Bug report
+description: Something khud does is wrong or broken
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, and what khud did.
+      placeholder: |
+        $ khud sync
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: dropdown
+    id: agents
+    attributes:
+      label: Which agents are wired on this machine
+      multiple: true
+      options: [Claude Code, Codex CLI, OpenCode, Cursor, Pi, Hermes, none yet]
+  - type: input
+    id: version
+    attributes:
+      label: khud version
+      description: "`khud --version`"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Platform
+      options: [Linux, macOS, Windows]
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `khud status`
+      description: Redact anything personal. This is rendered as a code block.
+      render: shell

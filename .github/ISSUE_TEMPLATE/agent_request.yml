@@ -1,0 +1,30 @@
+name: Add an agent target
+description: Ask for khud to wire an agent it does not support yet
+labels: ["enhancement", "agent-target"]
+body:
+  - type: input
+    id: agent
+    attributes:
+      label: Which agent
+      placeholder: Windsurf, Cline, Aider, Copilot agent mode, ...
+    validations:
+      required: true
+  - type: input
+    id: file
+    attributes:
+      label: Which file does it read for standing instructions
+      placeholder: "e.g. ~/.config/thing/AGENTS.md"
+    validations:
+      required: true
+  - type: textarea
+    id: detect
+    attributes:
+      label: How can khud tell it is installed
+      description: A binary path, a config directory, anything reliable.
+    validations:
+      required: true
+  - type: textarea
+    id: hooks
+    attributes:
+      label: Does it support session hooks
+      description: If so, where do hook files live and what triggers them?
