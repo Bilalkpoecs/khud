@@ -121,15 +121,9 @@ khud migrate-decisions   # split Decision-Log.md into per-entry temporal notes
 ```bash
 npm run build
 npm test
-npm pack
 ```
 
-Publishing requires npm 2FA. Use an automation token to publish without an OTP
-prompt, or pass one inline:
-
-```bash
-npm publish --otp=<code>
-```
+Issues and pull requests: https://github.com/Bilalkpoecs/khud/issues
 
 ## License
 
