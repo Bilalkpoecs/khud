@@ -2,10 +2,15 @@
 
 **Cross-agent identity compiler — خود**
 
-You use more than one AI coding agent. Each one wants your context in its own
-format, in its own file, in its own directory. So you either write the same
-preferences three times and watch them drift, or you give the weaker agents
-nothing.
+**khud is a cross-agent identity and memory compiler for AI coding agents.**
+It gives Claude Code, Codex, OpenCode, Cursor, Pi and Hermes one shared profile
+and one shared memory, instead of six drifting copies.
+
+If you use more than one AI coding agent, each wants your context in its own
+format, in its own file, in its own directory: `CLAUDE.md` for Claude Code,
+`AGENTS.md` for Codex, an identity file for OpenCode, an `.mdc` rule for Cursor.
+So you either write the same preferences six times and watch them drift, or you
+give the weaker agents nothing.
 
 khud keeps one canonical profile in `~/.khud/profile.json`, compiles it into
 each agent's native instruction format, and keeps them in sync. Write it once.
@@ -19,7 +24,7 @@ khud status
 ## What it actually does
 
 **One profile, many agents.** `khud sync` compiles `~/.khud/profile.json` into
-Claude Code, OpenCode and Cursor's own instruction files. Change a preference in
+each agent's own instruction file. Change a preference in
 one place; every agent picks it up.
 
 **Session memory that survives.** Session hooks capture work in progress to an
@@ -32,16 +37,31 @@ until you look at them. `khud diff` shows what an agent wants to add,
 `khud approve` accepts it, `khud reject` throws it away. Preferences are promoted
 only when there is evidence behind them, not because an agent asserted one once.
 
-## Supported agents
+## Which AI coding agents does khud support?
 
-| Agent | Status |
+Six targets. khud writes the file each agent already reads at session start, so
+there is nothing to configure inside the agent itself:
+
+| Agent | File khud writes |
 |---|---|
-| Claude Code | supported |
-| OpenCode | supported |
-| Cursor | supported |
+| Claude Code | `~/.claude/CLAUDE.md` |
+| Codex CLI | `~/.codex/AGENTS.md` |
+| OpenCode | `~/.config/opencode/agents/khud-identity.md` |
+| Cursor | `~/.cursor/rules/khud.mdc` |
+| Pi | `~/.pi/agent/AGENTS.md` |
+| Hermes | `~/.hermes/SOUL.md` |
 
 `khud setup` detects which of these are actually installed and wires only those.
 It will not create config for an agent you do not use.
+
+Codex and Pi both concatenate ancestor `AGENTS.md` files into their effective
+context, which khud accounts for when it compiles.
+
+**Not wired today.** The 2026 agent landscape is wider than these six: GitHub
+Copilot agent mode, Windsurf, Cline, Aider, Continue.dev, Roo Code, Kilo Code,
+Devin, Antigravity CLI and Grok Build. Anything that reads a plain `AGENTS.md`
+can be pointed at khud's compiled output by hand, but there is no detection or
+hook installation for it. Open an issue if you want one added.
 
 ## Platform support
 
@@ -92,7 +112,7 @@ khud migrate-decisions   # split Decision-Log.md into per-entry temporal notes
 
 - creates `~/.khud/profile.json` if it does not exist
 - keeps your existing profile unless `--reset-profile` is passed
-- detects installed Claude Code, OpenCode and Cursor targets
+- detects installed Claude Code, Codex, OpenCode, Cursor, Pi and Hermes targets
 - writes the agent-specific identity files for detected targets
 - installs the session hook files for detected targets
 

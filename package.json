@@ -1,7 +1,7 @@
 {
   "name": "khud",
   "version": "0.3.1",
-  "description": "Cross-agent identity compiler for Claude Code, OpenCode, and Cursor",
+  "description": "Cross-agent identity and memory compiler for AI coding agents. One profile compiled into Claude Code, Codex, OpenCode, Cursor, Pi and Hermes instruction files, with session memory into Obsidian.",
   "type": "module",
   "license": "MIT",
   "files": [
@@ -21,11 +21,31 @@
   },
   "keywords": [
     "ai",
+    "ai-agents",
+    "coding-agent",
+    "ai-coding-assistant",
     "claude",
+    "claude-code",
     "cursor",
     "opencode",
+    "agent-memory",
+    "cross-agent",
+    "context-management",
+    "shared-context",
     "developer-tools",
-    "automation"
+    "automation",
+    "cli",
+    "obsidian",
+    "agents-md",
+    "claude-md",
+    "cursorrules",
+    "instruction-files",
+    "codex",
+    "codex-cli",
+    "pi",
+    "hermes",
+    "agent-identity",
+    "ai-memory"
   ],
   "engines": {
     "node": ">=18"
