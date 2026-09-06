@@ -1,7 +1,135 @@
+# ---------------------------------------------------------------------------
+# Build and dependencies
+# ---------------------------------------------------------------------------
 node_modules/
 dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Packaging
+# ---------------------------------------------------------------------------
 *.tgz
-*.log
+*.tar.gz
+*.zip
+
+# ---------------------------------------------------------------------------
+# Secrets and credentials
+# This repo is public. Anything matched here would be permanently exposed by a
+# single `git push`, so the patterns are deliberately broad. Add exceptions with
+# an explicit `!` line rather than loosening a rule.
+# ---------------------------------------------------------------------------
 .env
 .env.*
+!.env.example
+!.env.sample
+*.env
+
+# npm, GitHub and cloud auth
+.npmrc
+.yarnrc
+.yarnrc.yml
+.netrc
+.npmauth
+gha-creds-*.json
+.github_token
+*.pypirc
+
+# Keys and certificates
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+*.ppk
+*.asc
+*.gpg
+*.kdbx
+
+# Anything self-declaring
+*secret*
+*secrets*
+*credential*
+*credentials*
+*password*
+*.token
+.token
+*apikey*
+*api_key*
+!**/*.test.*
+!**/*.spec.*
+
+# Cloud provider config
+.aws/
+.gcloud/
+gcloud-service-key.json
+service-account*.json
+*firebase-adminsdk*.json
+.azure/
+terraform.tfstate
+terraform.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# ---------------------------------------------------------------------------
+# khud runtime state — user data, never source
+# The canonical profile holds personal identity and preferences. It lives in
+# ~/.khud/, but a stray copy inside the repo must never be committed.
+# ---------------------------------------------------------------------------
+profile.json
+.khud/
+khud-profile*.json
+inbox/
+captures/
+*.capture.json
+pending-summary*.json
+
+# ---------------------------------------------------------------------------
+# Logs, caches, temp
+# ---------------------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-error.log*
+.cache/
+.tmp/
+tmp/
+*.tmp
+*.bak
+*.bak-*
+*.orig
+*.rej
+*.swp
+*~
+
+# ---------------------------------------------------------------------------
+# Editor and OS
+# ---------------------------------------------------------------------------
 .DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.sublime-workspace
+
+# ---------------------------------------------------------------------------
+# Local agent state (this project wires AI agents; do not ship their configs)
+# ---------------------------------------------------------------------------
+.claude/
+.cursor/
+.opencode/
+.hermes/
+.codex/
+.pi/
+CLAUDE.local.md
+AGENTS.local.md

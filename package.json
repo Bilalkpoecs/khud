@@ -60,5 +60,14 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bilalkpoecs/khud.git"
+  },
+  "homepage": "https://github.com/Bilalkpoecs/khud#readme",
+  "bugs": {
+    "url": "https://github.com/Bilalkpoecs/khud/issues"
+  },
+  "author": "Bilal Ahmad"
 }
