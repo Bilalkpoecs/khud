@@ -37,16 +37,18 @@ Detection is by command on `PATH` first, then by known config paths. An agent th
 
 Done when the output names every agent the user actually has.
 
-## 4. Replace the seed profile
+## 4. Fill in the profile
 
-**The seed profile ships with the author's own name, stack, preferences and machine constraints.** Left alone, khud compiles another person's identity into the user's agents. Edit `~/.khud/profile.json` to the real user, then:
+A fresh profile carries only the OS account name; every list starts empty, so the first sync compiles nothing the user did not write. Add what the agents should know, then recompile:
 
 ```bash
+khud add preference "explicit try/catch in async functions"
+khud add stack "PostgreSQL"
 khud sync
 khud status
 ```
 
-`--reset-profile` restores the seed, so it is the wrong tool here.
+Longer edits go straight into `~/.khud/profile.json`, followed by `khud sync`. `--reset-profile` empties it again, so reach for it only to start over.
 
 Done when `khud show` prints the user's own details and `khud status` reports every target wired.
 

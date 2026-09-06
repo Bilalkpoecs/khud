@@ -2,7 +2,7 @@
 
 **Cross-agent identity compiler — خود**
 
-[![Socket Badge](https://badge.socket.dev/npm/package/khud/0.3.3)](https://badge.socket.dev/npm/package/khud/0.3.3)
+[![Socket Badge](https://badge.socket.dev/npm/package/khud/0.4.0)](https://badge.socket.dev/npm/package/khud/0.4.0)
 
 **khud is a cross-agent identity and memory compiler for AI coding agents.**
 It gives Claude Code, Codex, OpenCode, Cursor, Pi and Hermes one shared profile
