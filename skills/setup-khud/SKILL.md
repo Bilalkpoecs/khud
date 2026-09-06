@@ -16,6 +16,8 @@ npm install -g khud
 khud --version
 ```
 
+Take the latest rather than pinning a version: 0.5.0 is the first release that leaves the user's own instruction files intact, and anything older overwrites them.
+
 An `EACCES` on the global prefix means npm is writing to a root-owned directory. Repoint it rather than using sudo:
 
 ```bash
