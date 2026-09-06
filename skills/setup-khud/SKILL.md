@@ -64,8 +64,25 @@ Done when `khud show` prints the user's own details and `khud status` reports ev
 | `khud add preference <text>` | append a preference, then `khud sync` |
 | `khud add decision <what> --reason <why>` | record a decision |
 
+## What it writes
+
+Everything khud touches is under the home directory. Nothing else on the machine is modified, and nothing is sent anywhere: `khud status` probes `127.0.0.1` and the package makes no other network call.
+
+| Path | Ownership |
+| --- | --- |
+| `~/.khud/profile.json`, `~/.khud/history/` | khud's own, the source of truth |
+| `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.pi/agent/AGENTS.md`, `~/.hermes/SOUL.md` | the user's; khud rewrites only the block between `<!-- khud:core:start -->` and `<!-- khud:core:end -->` and leaves the rest alone |
+| `~/.config/opencode/agents/khud-identity.md`, `~/.cursor/rules/khud.mdc` | khud's own, generated whole |
+| `~/.claude/settings.json`, `~/.cursor/hooks.json` | the agent's; khud adds its hook entries |
+
+Show the user `khud diff` before the first sync if they want to see a projection before it lands.
+
+## Trust boundary
+
+The profile is instruction text for every wired agent at once, so treat `~/.khud/profile.json` as something only the user writes. `khud add preference` and `khud add stack` write and sync immediately, with no review step, so run them from what the user actually said rather than from inference. Agent-written session summaries take the other path: they stay pending until `khud diff` and `khud approve`.
+
 ## Per-system notes
 
 Paths derive from the home directory, so Linux and macOS behave the same. On Windows khud reads `LOCALAPPDATA` for Cursor and `USERPROFILE` for the rest; run it from a shell where the global npm bin is on `PATH`.
 
-Memory capture writes into an Obsidian vault and the recall hook shells out to `python3`. Both are optional: when python3 or the recall script is absent the hook catches the failure and returns empty context, so identity sync keeps working. Setup is complete without them.
+Memory capture writes into an Obsidian vault, and the recall hook shells out to `python3` running a script khud does not install. Both are optional and inert when absent: the hook catches the failure and returns empty context, so identity sync works without either. Setup is complete without them.

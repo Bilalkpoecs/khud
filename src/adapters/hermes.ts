@@ -1,15 +1,9 @@
 import fs from 'node:fs';
 
-import {
-  HERMES_BLOCK_END,
-  HERMES_BLOCK_START,
-  profileCore,
-  renderCore,
-  renderProjection,
-} from '../lib/context.js';
+import { profileCore, renderCore, renderProjection } from '../lib/context.js';
 import { resolvePaths } from '../lib/paths.js';
 import type { Profile } from '../lib/types.js';
-import { measure, writeIfChanged, type ProjectionWrite } from './projection.js';
+import { applyManagedBlock, measure, writeIfChanged, type ProjectionWrite } from './projection.js';
 
 /**
  * Hermes personas are role definitions, not identity files.
@@ -29,18 +23,6 @@ export function hermesSoulFiles(): string[] {
     }
   }
   return files;
-}
-
-export function applyManagedBlock(existing: string, block: string): string {
-  const start = existing.indexOf(HERMES_BLOCK_START);
-  const end = existing.indexOf(HERMES_BLOCK_END);
-  if (start >= 0 && end > start) {
-    const after = end + HERMES_BLOCK_END.length;
-    const tail = existing.slice(after).replace(/^\n/, '');
-    return `${existing.slice(0, start)}${block}${tail}`;
-  }
-  const role = existing.trimEnd();
-  return role ? `${block}\n${role}\n` : block;
 }
 
 export function injectHermes(profile: Profile): ProjectionWrite {

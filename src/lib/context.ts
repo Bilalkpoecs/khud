@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { estimateTokens, TIER1_TOTAL_TOKENS } from './tier1.js';
 import type { Profile } from './types.js';
 
-export const HERMES_BLOCK_START = '<!-- khud:core:start -->';
-export const HERMES_BLOCK_END = '<!-- khud:core:end -->';
+export const KHUD_BLOCK_START = '<!-- khud:core:start -->';
+export const KHUD_BLOCK_END = '<!-- khud:core:end -->';
 
 // Preview targets are separate until each live adapter has passed migration checks.
 export const CONTEXT_TARGETS = ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes'] as const;
@@ -80,10 +80,10 @@ export function renderProjection(target: ContextTarget, core: string): string {
   if (target === 'cursor') {
     return `---\ndescription: Shared developer instructions\nalwaysApply: true\n---\n\n${core}`;
   }
-  if (target === 'hermes') {
-    return `${HERMES_BLOCK_START}\n${core}${HERMES_BLOCK_END}\n`;
+  if (target === 'opencode') {
+    return core;
   }
-  return core;
+  return `${KHUD_BLOCK_START}\n${core}${KHUD_BLOCK_END}\n`;
 }
 
 /** Narrow a full stored profile to the projected core. Legacy fields stay parseable. */
