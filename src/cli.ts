@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
+
 import { Command } from 'commander';
 
 import { cmdAddDecision, cmdAddPreference, cmdAddStack, cmdSetStatus } from './commands/add.js';
@@ -16,12 +18,15 @@ import { cmdShow } from './commands/show.js';
 import { cmdStatus } from './commands/status.js';
 import { cmdSync } from './commands/sync.js';
 
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json') as { version: string };
+
 const program = new Command();
 
 program
   .name('khud')
   .description('Cross-agent identity compiler - خود')
-  .version('0.2.0');
+  .version(version);
 
 program
   .command('setup')
