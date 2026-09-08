@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""khud-check [days] — npm + GitHub stats for the khud package. Default 14 days."""
+import json, subprocess, sys, urllib.request
+from datetime import date, timedelta
+
+PKG = "khud"
+REPO = "Bilalkpoecs/khud"
+
+def _get(url):
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            return json.load(r)
+    except Exception as e:
+        return {"_error": str(e)}
+
+def _gh(path):
+    try:
+        out = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=20)
+        if out.returncode != 0:
+            return {"_error": out.stderr.strip()}
+        return json.loads(out.stdout)
+    except Exception as e:
+        return {"_error": str(e)}
+
+def main():
+    days = 14
+    if len(sys.argv) > 1:
+        try:
+            days = int(sys.argv[1])
+        except ValueError:
+            print(f"usage: khud-check [days]   (got '{sys.argv[1]}')"); sys.exit(1)
+    end = date.today()
+    start = end - timedelta(days=days)
+    rng = f"{start.isoformat()}:{end.isoformat()}"
+
+    C = {"h": "\033[1;36m", "d": "\033[2m", "g": "\033[32m", "y": "\033[33m",
+         "r": "\033[31m", "b": "\033[1m", "x": "\033[0m"}
+    if not sys.stdout.isatty():
+        C = {k: "" for k in C}
+
+    print(f"\n{C['h']}khud{C['x']}  stats over last {C['b']}{days}d{C['x']} "
+          f"{C['d']}({start} .. {end}){C['x']}\n")
+
+    # ---- npm ----
+    reg = _get(f"https://registry.npmjs.org/{PKG}")
+    dl = _get(f"https://api.npmjs.org/downloads/point/{rng}/{PKG}")
+    win = "last-week"  # npm per-version API only supports last-week / last-day
+    perv = _get(f"https://api.npmjs.org/versions/{PKG}/{win}")
+
+    latest = reg.get("dist-tags", {}).get("latest", "?")
+    pub = reg.get("time", {}).get(latest, "")[:10]
+    total = dl.get("downloads", "?")
+
+    print(f"{C['b']}npm{C['x']}  {C['d']}npmjs.com/package/{PKG}{C['x']}")
+    print(f"  latest      {C['g']}{latest}{C['x']}  {C['d']}published {pub}{C['x']}")
+    print(f"  downloads   {C['b']}{total}{C['x']} over {days}d")
+
+    pv = perv.get("downloads", {}) if isinstance(perv, dict) else {}
+    spread = 0
+    if pv:
+        items = sorted(pv.items(), key=lambda kv: kv[1], reverse=True)
+        vals = [v for v in pv.values() if v > 0]
+        pv_total = sum(pv.values()) or 1
+        vw = max((len(str(v)) for _, v in items), default=3)
+        print(f"\n  {C['d']}per-version ({win}){C['x']}")
+        print(f"  {C['d']}┌─────────┬{'─'*(vw+2)}┬───────┐{C['x']}")
+        print(f"  {C['d']}│{C['x']} {C['b']}version{C['x']} {C['d']}│{C['x']} "
+              f"{'dl'.rjust(vw)} {C['d']}│{C['x']}  {C['b']}share{C['x']} {C['d']}│{C['x']}")
+        print(f"  {C['d']}├─────────┼{'─'*(vw+2)}┼───────┤{C['x']}")
+        for k, v in items:
+            mark = C['g'] if k == latest else C['x']
+            print(f"  {C['d']}│{C['x']} {mark}{k.ljust(7)}{C['x']} {C['d']}│{C['x']} "
+                  f"{str(v).rjust(vw)} {C['d']}│{C['x']} {f'{v/pv_total:>5.0%}'} {C['d']}│{C['x']}")
+        print(f"  {C['d']}└─────────┴{'─'*(vw+2)}┴───────┘{C['x']}")
+        if len(vals) >= 3:
+            spread = (min(vals) / max(vals)) if max(vals) else 0
+
+    # ---- GitHub ----
+    repo = _gh(f"repos/{REPO}")
+    views = _gh(f"repos/{REPO}/traffic/views")
+    clones = _gh(f"repos/{REPO}/traffic/clones")
+    rels = _gh(f"repos/{REPO}/releases")
+
+    print(f"\n{C['b']}GitHub{C['x']}  {C['d']}github.com/{REPO}{C['x']}")
+    if repo.get("_error"):
+        print(f"  {C['r']}error: {repo['_error']}{C['x']}")
+    else:
+        stars = repo.get("stargazers_count", 0)
+        forks = repo.get("forks_count", 0)
+        watch = repo.get("subscribers_count", 0)
+        issues = repo.get("open_issues_count", 0)
+        nrel = len(rels) if isinstance(rels, list) else 0
+        latest_rel = rels[0]["tag_name"] if isinstance(rels, list) and rels else "none"
+        print(f"  stars {C['b']}{stars}{C['x']}  forks {forks}  watchers {watch}  open-issues {issues}")
+        print(f"  releases {nrel}  latest-release {C['g']}{latest_rel}{C['x']}")
+        vc = views.get("count", 0); vu = views.get("uniques", 0)
+        cc = clones.get("count", 0); cu = clones.get("uniques", 0)
+        print(f"  traffic     {C['d']}(GitHub caps at 14d){C['x']} "
+              f"views {vc}/{vu}u  clones {cc}/{cu}u")
+
+    # ---- verdict ----
+    real = (repo.get("stargazers_count", 0) + repo.get("forks_count", 0)
+            + views.get("uniques", 0) + clones.get("uniques", 0))
+    print(f"\n{C['b']}verdict{C['x']}")
+    if isinstance(total, int) and total > 50 and real == 0:
+        print(f"  {C['y']}downloads are almost certainly scanners/mirrors, not users.{C['x']}")
+        print(f"  {C['d']}high npm count + zero GitHub uniques/stars = bots.{C['x']}")
+    elif real == 0:
+        print(f"  {C['d']}no real-user signal yet (0 stars, 0 unique GitHub visitors).{C['x']}")
+    else:
+        print(f"  {C['g']}real signal present: {real} stars+forks+unique visitors.{C['x']}")
+    if spread and spread > 0.5:
+        print(f"  {C['y']}downloads spread evenly across versions "
+              f"(min/max={spread:.0%}) = scanner pattern, not humans on latest.{C['x']}")
+    print(f"  {C['d']}real traction = stars, issues, unique clones. downloads is vanity.{C['x']}\n")
+
+if __name__ == "__main__":
+    main()
