@@ -2,6 +2,11 @@
 
 **Cross-agent identity compiler — خود**
 
+[![npm version](https://img.shields.io/npm/v/khud)](https://www.npmjs.com/package/khud)
+[![npm downloads](https://img.shields.io/npm/dm/khud)](https://www.npmjs.com/package/khud)
+[![GitHub release](https://img.shields.io/github/v/release/Bilalkpoecs/khud)](https://github.com/Bilalkpoecs/khud/releases)
+[![node version](https://img.shields.io/node/v/khud)](https://www.npmjs.com/package/khud)
+[![license](https://img.shields.io/npm/l/khud)](./LICENSE)
 [![Socket Badge](https://badge.socket.dev/npm/package/khud/0.5.0)](https://badge.socket.dev/npm/package/khud/0.5.0)
 
 **khud is a cross-agent identity and memory compiler for AI coding agents.**
