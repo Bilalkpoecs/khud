@@ -361,7 +361,7 @@ export function installCursorHooks(): void {
   file.hooks.beforeSubmitPrompt = mergeCursorEvent(
     'beforeSubmitPrompt',
     file.hooks.beforeSubmitPrompt,
-    [{ command: recallCommand('cursor'), timeout: 15 }],
+    [], // Cursor beforeSubmitPrompt cannot inject context; the recall rule handles it.
     managed
   );
   file.hooks.stop = mergeCursorEvent(
@@ -402,6 +402,7 @@ import path from 'node:path';
 const HOME = process.env.HOME || os.homedir();
 const STOP_HOOK = path.join(HOME, '.local/bin/khud-obsidian-stop');
 const PROMPT_RECALL = '${promptRecallScript()}';
+const PYTHON_RUNTIME = '${path.join(paths().desktopDir, 'bilal-workspace/Active/turbovec-obsidian/.venv/bin/python')}';
 const PLUGIN_LOG = path.join(HOME, '.khud/history/opencode-plugin.log');
 
 mkdirSync(path.dirname(PLUGIN_LOG), { recursive: true });
@@ -440,21 +441,24 @@ function finalize(sessionID, trigger) {
 }
 
 function recall(prompt, sessionID) {
-  if (!prompt || prompt.length < 15 || prompt.startsWith('/')) return '';
+  if (!prompt) return ''; // The shared hook handles explicit recall and control messages.
   try {
-    const out = execFileSync('python3', [PROMPT_RECALL], {
+    const out = execFileSync(PYTHON_RUNTIME, ['-E', '-s', PROMPT_RECALL], {
       input: JSON.stringify({
         prompt,
         client: 'opencode',
         session_id: sessionID,
+        cwd: process.cwd(),
         output_format: 'json'
       }),
       encoding: 'utf8',
       timeout: 12000
     });
     const parsed = JSON.parse(out || '{}');
+    if (parsed.diagnostic) log('recall unavailable: ' + parsed.diagnostic);
     return String(parsed.context || '');
-  } catch {
+  } catch (error) {
+    log('recall failed: ' + String(error));
     return '';
   }
 }

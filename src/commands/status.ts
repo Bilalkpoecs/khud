@@ -56,6 +56,7 @@ function projectionFiles(target: SupportedTarget): string[] {
   if (target === 'opencode') return [resolved.opencodeIdentityFile];
   if (target === 'cursor') return [resolved.cursorRuleFile];
   if (target === 'pi') return [resolved.piAgentsFile];
+  if (target === 'antigravity') return [resolved.antigravityRuleFile];
   const souls = hermesSoulFiles();
   return souls.length ? souls : [resolved.hermesSoulFile];
 }

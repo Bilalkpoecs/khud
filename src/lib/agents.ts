@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 import { resolvePaths } from './paths.js';
 
-export const SUPPORTED_TARGETS = ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes'] as const;
+export const SUPPORTED_TARGETS = ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes', 'antigravity'] as const;
 
 export type SupportedTarget = (typeof SUPPORTED_TARGETS)[number];
 
@@ -34,6 +34,7 @@ const AGENT_NAMES: Record<SupportedTarget, string> = {
   cursor: 'Cursor',
   pi: 'Pi',
   hermes: 'Hermes',
+  antigravity: 'Antigravity',
 };
 
 export function getAgentName(target: SupportedTarget): string {
@@ -66,6 +67,12 @@ export function detectInstalledAgents(): DetectedAgent[] {
     path.join(paths.configDir, 'Cursor'),
     path.join(localAppData, 'Programs', 'Cursor'),
     path.join(localAppData, 'Cursor')
+  ]);
+  maybeAddDetection(detections, 'antigravity', 'antigravity', [
+    '/usr/bin/antigravity',
+    paths.antigravityDir,
+    path.join(paths.homeDir, '.gemini', 'antigravity'),
+    path.join(paths.configDir, 'Antigravity'),
   ]);
 
   return detections;

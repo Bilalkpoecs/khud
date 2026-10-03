@@ -421,12 +421,12 @@ test('installing cursor hooks preserves unrelated entries and replaces the retir
   assert.ok(!commands('sessionStart').includes('./hooks/session-start.sh'));
   assert.ok(commands('stop').includes('my-own-stop'));
   assert.ok(commands('stop').some((c) => c.endsWith('.local/bin/khud-obsidian-stop')));
-  assert.ok(commands('beforeSubmitPrompt').some((c) => c === `${path.join(root, '.local/bin/turbovec-recall-prompt')} --client cursor`));
+  assert.deepEqual(commands('beforeSubmitPrompt'), []);
 
   installCursorHooks();
   const again = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
   assert.equal(again.hooks.sessionStart.filter((h) => h.command.includes('khud')).length, 1);
-  assert.equal(again.hooks.beforeSubmitPrompt.length, 1);
+  assert.equal(again.hooks.beforeSubmitPrompt.length, 0);
   assert.equal(again.hooks.stop.length, 2);
 });
 
@@ -919,6 +919,5 @@ test('installing hooks retires every old recall wrapper and leaves one recall ho
   installCursorHooks();
   const cursor = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
   const cursorCommands = cursor.hooks.beforeSubmitPrompt.map((h) => h.command);
-  assert.equal(cursorCommands.length, 1);
-  assert.equal(cursorCommands[0], `${path.join(root, '.local/bin/turbovec-recall-prompt')} --client cursor`);
+  assert.deepEqual(cursorCommands, []);
 });

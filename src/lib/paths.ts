@@ -49,6 +49,8 @@ export interface ResolvedPaths {
   hermesDir: string;
   hermesSoulFile: string;
   hermesProfilesDir: string;
+  antigravityDir: string;
+  antigravityRuleFile: string;
   ancestorAgentsFile: string;
 }
 
@@ -81,6 +83,8 @@ export function resolvePaths(
   const codexDir = pathApi.join(homeDir, '.codex');
   const piAgentDir = pathApi.join(homeDir, '.pi', 'agent');
   const hermesDir = pathApi.join(homeDir, '.hermes');
+  const antigravityDir = pathApi.join(homeDir, '.gemini');
+  const antigravityRuleFile = pathApi.join(antigravityDir, 'GEMINI.md');
 
   return {
     homeDir,
@@ -117,6 +121,8 @@ export function resolvePaths(
     hermesDir,
     hermesSoulFile: pathApi.join(hermesDir, 'SOUL.md'),
     hermesProfilesDir: pathApi.join(hermesDir, 'profiles'),
+    antigravityDir,
+    antigravityRuleFile,
     // Codex and Pi both concatenate ancestor AGENTS.md files into the effective load.
     ancestorAgentsFile: pathApi.join(homeDir, 'AGENTS.md')
   };

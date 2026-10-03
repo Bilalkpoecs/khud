@@ -54,13 +54,13 @@ function snapshot(root, relative = '') {
   return result;
 }
 
-test('preview retains every supplied rule across six formats without writing live files or carrying project history', (t) => {
+test('preview retains every supplied rule across seven formats without writing live files or carrying project history', (t) => {
   const { root } = fixture(t);
   const before = snapshot(root);
   const result = runPreview(root, ['--json']);
   assert.equal(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout);
-  assert.deepEqual(report.projections.map((item) => item.target), ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes']);
+  assert.deepEqual(report.projections.map((item) => item.target), ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes', 'antigravity']);
   assert.equal(report.token_estimate, 'characters/4');
   assert.equal(report.budget_tokens, 800);
   assert.match(report.core.sha256, /^[a-f0-9]{64}$/);

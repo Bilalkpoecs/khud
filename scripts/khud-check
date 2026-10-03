@@ -99,20 +99,30 @@ def main():
               f"views {vc}/{vu}u  clones {cc}/{cu}u")
 
     # ---- verdict ----
-    real = (repo.get("stargazers_count", 0) + repo.get("forks_count", 0)
-            + views.get("uniques", 0) + clones.get("uniques", 0))
+    # human signal = engagement humans do deliberately: star, fork, open issue,
+    # or actually browse the repo page (unique views). Clones are NOT counted:
+    # GitHub does not filter bots from clone traffic, and CI, package mirrors,
+    # the Go proxy, Dependabot/Renovate, and security scanners clone constantly.
+    human = (repo.get("stargazers_count", 0) + repo.get("forks_count", 0)
+             + repo.get("open_issues_count", 0) + views.get("uniques", 0))
+    cu = clones.get("uniques", 0)
     print(f"\n{C['b']}verdict{C['x']}")
-    if isinstance(total, int) and total > 50 and real == 0:
+    if isinstance(total, int) and total > 50 and human == 0:
         print(f"  {C['y']}downloads are almost certainly scanners/mirrors, not users.{C['x']}")
-        print(f"  {C['d']}high npm count + zero GitHub uniques/stars = bots.{C['x']}")
-    elif real == 0:
-        print(f"  {C['d']}no real-user signal yet (0 stars, 0 unique GitHub visitors).{C['x']}")
+        print(f"  {C['d']}high npm count + zero human GitHub signal = bots.{C['x']}")
+    elif human == 0:
+        print(f"  {C['d']}no real-user signal yet (0 stars, 0 forks, 0 issues, 0 unique views).{C['x']}")
     else:
-        print(f"  {C['g']}real signal present: {real} stars+forks+unique visitors.{C['x']}")
+        print(f"  {C['g']}human signal present: {human} "
+              f"(stars+forks+issues+unique views).{C['x']}")
+    if cu > 0 and human == 0:
+        print(f"  {C['y']}{cu} unique clones but 0 human signal = bot clones "
+              f"(CI, mirrors, scanners). clones are not filtered for bots.{C['x']}")
     if spread and spread > 0.5:
         print(f"  {C['y']}downloads spread evenly across versions "
               f"(min/max={spread:.0%}) = scanner pattern, not humans on latest.{C['x']}")
-    print(f"  {C['d']}real traction = stars, issues, unique clones. downloads is vanity.{C['x']}\n")
+    print(f"  {C['d']}real traction = stars, forks, issues, unique views. "
+          f"downloads and clones are vanity (bot-inflated).{C['x']}\n")
 
 if __name__ == "__main__":
     main()

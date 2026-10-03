@@ -7,7 +7,7 @@ export const KHUD_BLOCK_START = '<!-- khud:core:start -->';
 export const KHUD_BLOCK_END = '<!-- khud:core:end -->';
 
 // Preview targets are separate until each live adapter has passed migration checks.
-export const CONTEXT_TARGETS = ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes'] as const;
+export const CONTEXT_TARGETS = ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes', 'antigravity'] as const;
 export type ContextTarget = (typeof CONTEXT_TARGETS)[number];
 
 export interface ContextProfile {

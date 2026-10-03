@@ -64,9 +64,10 @@ const OUTPUTS = {
   opencode: '.config/opencode/agents/khud-identity.md',
   cursor: '.cursor/rules/khud.mdc',
   pi: '.pi/agent/AGENTS.md',
+  antigravity: '.gemini/GEMINI.md',
 };
 
-test('sync all writes one shared core to all six agents and drops project history', (t) => {
+test('sync all writes one shared core to all seven agents and drops project history', (t) => {
   const { root } = fixture(t);
   const result = run(root, ['sync', '--to', 'all']);
   assert.equal(result.status, 0, result.stderr + result.stdout);
@@ -124,8 +125,8 @@ test('one failing target makes the whole sync visibly unsuccessful', (t) => {
   assert.match(fs.readFileSync(path.join(root, OUTPUTS.claude), 'utf8'), /Never use default exports/);
 });
 
-test('sync --to accepts each of the six targets individually', (t) => {
-  for (const target of ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes']) {
+test('sync --to accepts each of the seven targets individually', (t) => {
+  for (const target of ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes', 'antigravity']) {
     const { root } = fixture(t);
     const result = run(root, ['sync', '--to', target]);
     assert.equal(result.status, 0, `${target}: ${result.stderr}`);
@@ -141,11 +142,11 @@ test('hermes managed block updates in place instead of stacking copies', (t) => 
   assert.match(body, /You are the ops role\./);
 });
 
-test('status reports all six targets', (t) => {
+test('status reports all seven targets', (t) => {
   const { root } = fixture(t);
   run(root, ['sync', '--to', 'all']);
   const result = run(root, ['status']);
-  for (const target of ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes']) {
+  for (const target of ['claude', 'codex', 'opencode', 'cursor', 'pi', 'hermes', 'antigravity']) {
     assert.match(result.stdout, new RegExp(target), `status omits ${target}`);
   }
 });

@@ -6,6 +6,7 @@ import { injectCursorGlobal } from '../adapters/cursor.js';
 import { injectHermes } from '../adapters/hermes.js';
 import { injectOpencode } from '../adapters/opencode.js';
 import { injectPi } from '../adapters/pi.js';
+import { injectAntigravity } from '../adapters/antigravity.js';
 import type { ProjectionWrite } from '../adapters/projection.js';
 import { type SupportedTarget, expandTargets } from './agents.js';
 import { displayPath } from './paths.js';
@@ -20,6 +21,7 @@ const INJECTORS: Record<SupportedTarget, (profile: Profile) => ProjectionWrite> 
   cursor: injectCursorGlobal,
   pi: injectPi,
   hermes: injectHermes,
+  antigravity: injectAntigravity,
 };
 
 export interface SyncResult {
